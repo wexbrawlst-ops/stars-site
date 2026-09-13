@@ -80,7 +80,7 @@ $("usePromo").onclick=async()=>{
   }catch(e){$("promoMsg").textContent=e.message}
 };
 
-$("flow").addEventListener("click",async e=>{
+$("withdraw").addEventListener("click",async e=>{
   let a=e.target.dataset.amount,g=e.target.dataset.g,p=e.target.dataset.p,m=e.target.dataset.m;
   if(a){
     amount=+a;
