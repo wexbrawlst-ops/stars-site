@@ -9,6 +9,8 @@
 <button data-page="promo">🎟 Промокод</button>
 <button data-page="spin">🎰 Спин</button>
 <button data-page="withdrawals">📊 Выводы</button>
+<button data-page="referrals">🤝 Рефералы</button>
+<button data-page="leaderboard">🏆 Топ</button>
 <button data-page="settings">⚙️ Настройки</button>
 <button id="adminBtn" data-page="admin" hidden>🛠 Админ</button>
 </nav>
@@ -17,6 +19,8 @@
 <section id="promo" class="card page" hidden><button class="dark" data-page="tasks">← Главное меню</button><h2>🎟 Промокод</h2><input id="promoCode" placeholder="Введите промокод"><button id="usePromo">Активировать</button><p id="promoMsg"></p></section>
 <section id="spin" class="card page" hidden><button class="dark" data-page="tasks">← Главное меню</button><h2>🎰 Free Spin</h2><p>Раз в 24 часа можно испытать удачу: 0 ⭐ (40%) / 1 ⭐ (50%) / 5 ⭐ (10%).</p><button id="spinBtn">Крутить</button><p id="spinMsg"></p></section>
 <section id="withdrawals" class="card page" hidden><button class="dark" data-page="tasks">← Главное меню</button><h2>📊 Выводы</h2><p>Всего выводов подтверждено: <b id="withdrawCount">0</b></p><div id="withdrawList"></div></section>
+<section id="referrals" class="card page" hidden><button class="dark" data-page="tasks">← Главное меню</button><h2>🤝 Рефералы</h2><p>Приглашай друзей (максимум 3 за всё время). Когда приглашённый выполнит 2 задания — тебе начислится 1 ⭐.</p><p>Приглашено: <b id="refCount">0</b>/3</p><input id="refLink" readonly><button id="copyRef">Скопировать ссылку</button><p id="refMsg"></p><div id="refList"></div></section>
+<section id="leaderboard" class="card page" hidden><button class="dark" data-page="tasks">← Главное меню</button><h2>🏆 Топ по выводам</h2><div id="leaderboardList"></div></section>
 <section id="settings" class="card page" hidden><button class="dark" data-page="tasks">← Главное меню</button><h2>⚙️ Настройки</h2><p>Тема оформления сайта:</p><button id="themeToggle">Сменить тему</button></section>
 <section id="admin" class="card page" hidden>
 <h2>🛠 Админ-панель</h2>
