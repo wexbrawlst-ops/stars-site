@@ -1,14 +1,33 @@
 import{initializeApp}from"https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
 import{getAuth,createUserWithEmailAndPassword,signInWithEmailAndPassword,onAuthStateChanged,signOut}from"https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
-import{getFirestore,doc,setDoc,updateDoc,deleteDoc,collection,addDoc,onSnapshot,query,where,orderBy,runTransaction,serverTimestamp}from"https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+import{getFirestore,doc,setDoc,updateDoc,deleteDoc,collection,addDoc,onSnapshot,query,where,orderBy,limit,increment,runTransaction,serverTimestamp}from"https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 
 const firebaseConfig={apiKey:"AIzaSyCgiJ2OLgRf9rep6enYQTohuHGf9PAT6xQ",authDomain:"stars-f6d41.firebaseapp.com",projectId:"stars-f6d41",storageBucket:"stars-f6d41.firebasestorage.app",messagingSenderId:"294339505512",appId:"1:294339505512:web:2c0a8cc124c91d5d6dbadd"};
 const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app),$=id=>document.getElementById(id);
 const ADMIN_EMAIL="brawlstarsk93k@gmail.com";
 let u,amount,gift,unsubOrders,unsubPending,unsubApproved,unsubAdminTasks;
-let tasksCache=[],subsByTask={};
+let tasksCache=[],subsByTask={},lastSpinMs=0;
 
-$("reg").onclick=async()=>{try{const c=await createUserWithEmailAndPassword(auth,$("email").value,$("pass").value);await setDoc(doc(db,"users",c.user.uid),{email:c.user.email,balance:0,createdAt:serverTimestamp()})}catch(e){$("authMsg").textContent=e.message}};
+if(localStorage.getItem("theme")==="light")document.body.classList.add("light");
+$("themeToggle").onclick=()=>{
+  document.body.classList.toggle("light");
+  localStorage.setItem("theme",document.body.classList.contains("light")?"light":"dark");
+};
+
+setDoc(doc(db,"stats","global"),{totalVisits:increment(1)},{merge:true}).catch(()=>{});
+onSnapshot(doc(db,"stats","global"),s=>{
+  const d=s.data()||{};
+  $("visitCount").textContent=d.totalVisits||0;
+  $("userCount").textContent=d.totalUsers||0;
+});
+
+$("reg").onclick=async()=>{
+  try{
+    const c=await createUserWithEmailAndPassword(auth,$("email").value,$("pass").value);
+    await setDoc(doc(db,"users",c.user.uid),{email:c.user.email,balance:0,createdAt:serverTimestamp()});
+    await setDoc(doc(db,"stats","global"),{totalUsers:increment(1)},{merge:true});
+  }catch(e){$("authMsg").textContent=e.message}
+};
 $("login").onclick=async()=>{try{await signInWithEmailAndPassword(auth,$("email").value,$("pass").value)}catch(e){$("authMsg").textContent=e.message}};
 $("logout").onclick=()=>signOut(auth);
 
@@ -16,9 +35,16 @@ onAuthStateChanged(auth,x=>{
   u=x;
   if(!x){$("auth").hidden=false;$("main").hidden=true;return}
   $("auth").hidden=true;$("main").hidden=false;
-  onSnapshot(doc(db,"users",u.uid),s=>{const d=s.data()||{};$("bal").textContent=d.balance||0;$("adminBtn").hidden=u.email!==ADMIN_EMAIL});
+  onSnapshot(doc(db,"users",u.uid),s=>{
+    const d=s.data()||{};
+    $("bal").textContent=d.balance||0;
+    $("adminBtn").hidden=u.email!==ADMIN_EMAIL;
+    lastSpinMs=d.lastSpinAt?.toMillis()||0;
+    updateSpinUI();
+  });
   listenTasks();
   listenMySubs();
+  listenWithdrawals();
 });
 
 function listenTasks(){
@@ -109,6 +135,45 @@ $("withdraw").addEventListener("click",async e=>{
   }
 });
 
+function updateSpinUI(){
+  let remaining=24*60*60*1000-(Date.now()-lastSpinMs);
+  if(remaining>0){
+    $("spinBtn").disabled=true;
+    let hh=Math.floor(remaining/3600000),mm=Math.floor((remaining%3600000)/60000),ss=Math.floor((remaining%60000)/1000);
+    $("spinMsg").textContent=`Следующий спин через ${hh}ч ${mm}м ${ss}с`;
+  }else{
+    $("spinBtn").disabled=false;
+    if($("spinMsg").textContent.startsWith("Следующий"))$("spinMsg").textContent="";
+  }
+}
+setInterval(updateSpinUI,1000);
+$("spinBtn").onclick=async()=>{
+  try{
+    let result;
+    await runTransaction(db,async t=>{
+      let ud=doc(db,"users",u.uid),us=await t.get(ud),d=us.data()||{};
+      let last=d.lastSpinAt?.toMillis()||0;
+      if(Date.now()-last<24*60*60*1000)throw Error("Уже крутили сегодня.");
+      let r=Math.random();
+      result=r<0.4?0:(r<0.9?1:5);
+      t.update(ud,{balance:(d.balance||0)+result,lastSpinAt:serverTimestamp()});
+    });
+    $("spinMsg").textContent=result===0?"Не повезло — выпало 0 ⭐. Попробуйте завтра!":`Ура! Выпало ${result} ⭐!`;
+  }catch(e){$("spinMsg").textContent=e.message}
+};
+
+function listenWithdrawals(){
+  onSnapshot(query(collection(db,"withdrawals_public"),orderBy("approvedAt","desc")),s=>{
+    $("withdrawCount").textContent=s.size;
+    $("withdrawList").innerHTML="";
+    s.docs.slice(0,20).forEach(x=>{
+      let d=x.data(),e=document.createElement("div");e.className="sub";
+      e.innerHTML=`${safe(d.targetUsername)} получил ${safe(d.gift)} · ${d.amount} ⭐`;
+      $("withdrawList").append(e);
+    });
+  });
+}
+
 $("addTask").onclick=async()=>{
   let title=$("tTitle").value.trim(),description=$("tDesc").value.trim(),link=$("tLink").value.trim(),reward=parseFloat($("tReward").value);
   if(!title||!link||!reward||reward<=0)return alert("Заполни название, ссылку и награду (больше 0)");
@@ -196,7 +261,10 @@ function loadOrders(){
       let d=x.data(),e=document.createElement("div");e.className="order";
       e.innerHTML=`${d.amount} ⭐ · ${safe(d.gift)} · ${safe(d.targetUsername)} · ${safe(d.privacy)} · ${safe(d.message||"Без надписи")}<br>Статус: ${safe(d.status)} ${d.status==="pending"?'<button>Подтвердить</button>':''}`;
       let b=e.querySelector("button");
-      if(b)b.onclick=()=>updateDoc(doc(db,"orders",x.id),{status:"approved",approvedAt:serverTimestamp()});
+      if(b)b.onclick=async()=>{
+        await updateDoc(doc(db,"orders",x.id),{status:"approved",approvedAt:serverTimestamp()});
+        await addDoc(collection(db,"withdrawals_public"),{gift:d.gift,amount:d.amount,targetUsername:d.targetUsername,approvedAt:serverTimestamp()});
+      };
       $("orders").append(e);
     });
   });
