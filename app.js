@@ -8,12 +8,14 @@ const ADMIN_EMAIL="brawlstarsk93k@gmail.com";
 let u,amount,gift,unsubOrders,unsubPending,unsubApproved,unsubAdminTasks;
 let tasksCache=[],subsByTask={},lastSpinMs=0;
 
+// Тема оформления
 if(localStorage.getItem("theme")==="light")document.body.classList.add("light");
 $("themeToggle").onclick=()=>{
   document.body.classList.toggle("light");
   localStorage.setItem("theme",document.body.classList.contains("light")?"light":"dark");
 };
 
+// Счётчик посещений (публичный, не требует входа)
 setDoc(doc(db,"stats","global"),{totalVisits:increment(1)},{merge:true}).catch(()=>{});
 onSnapshot(doc(db,"stats","global"),s=>{
   const d=s.data()||{};
@@ -21,10 +23,25 @@ onSnapshot(doc(db,"stats","global"),s=>{
   $("userCount").textContent=d.totalUsers||0;
 });
 
+const refParam=new URLSearchParams(location.search).get("ref");
 $("reg").onclick=async()=>{
   try{
     const c=await createUserWithEmailAndPassword(auth,$("email").value,$("pass").value);
-    await setDoc(doc(db,"users",c.user.uid),{email:c.user.email,balance:0,createdAt:serverTimestamp()});
+    let referredBy=null,referralDocId=null;
+    if(refParam&&refParam!==c.user.uid){
+      try{
+        await runTransaction(db,async t=>{
+          let rud=doc(db,"users",refParam),rus=await t.get(rud);
+          if(rus.exists()&&(rus.data().referralCount||0)<3){
+            let rd=doc(collection(db,"referrals"));
+            t.set(rd,{referrerId:refParam,referredId:c.user.uid,tasksCompleted:0,rewarded:false,createdAt:serverTimestamp()});
+            t.update(rud,{referralCount:(rus.data().referralCount||0)+1});
+            referredBy=refParam;referralDocId=rd.id;
+          }
+        });
+      }catch(e){/*реферал не критичен — регистрация продолжается*/}
+    }
+    await setDoc(doc(db,"users",c.user.uid),{email:c.user.email,balance:0,createdAt:serverTimestamp(),referredBy,referralDocId,referralRewarded:false});
     await setDoc(doc(db,"stats","global"),{totalUsers:increment(1)},{merge:true});
   }catch(e){$("authMsg").textContent=e.message}
 };
@@ -35,17 +52,55 @@ onAuthStateChanged(auth,x=>{
   u=x;
   if(!x){$("auth").hidden=false;$("main").hidden=true;return}
   $("auth").hidden=true;$("main").hidden=false;
+  $("refLink").value=location.origin+location.pathname+"?ref="+u.uid;
   onSnapshot(doc(db,"users",u.uid),s=>{
     const d=s.data()||{};
     $("bal").textContent=d.balance||0;
     $("adminBtn").hidden=u.email!==ADMIN_EMAIL;
     lastSpinMs=d.lastSpinAt?.toMillis()||0;
     updateSpinUI();
+    $("refCount").textContent=d.referralCount||0;
   });
   listenTasks();
   listenMySubs();
   listenWithdrawals();
+  listenMyReferrals();
+  listenLeaderboard();
 });
+
+$("copyRef").onclick=()=>{
+  navigator.clipboard.writeText($("refLink").value).then(()=>{$("refMsg").textContent="Ссылка скопирована!"});
+};
+
+function listenMyReferrals(){
+  onSnapshot(query(collection(db,"referrals"),where("referrerId","==",u.uid)),s=>{
+    $("refList").innerHTML="";
+    let list=s.docs.map(x=>x.data());
+    list.sort((a,b)=>(b.createdAt?.toMillis()||0)-(a.createdAt?.toMillis()||0));
+    list.forEach(d=>{
+      let e=document.createElement("div");e.className="sub";
+      e.innerHTML=d.rewarded?`✅ Друг выполнил задания — начислена 1 ⭐`:`⏳ Прогресс друга: ${d.tasksCompleted||0}/2 заданий`;
+      $("refList").append(e);
+    });
+  });
+}
+
+function listenLeaderboard(){
+  onSnapshot(collection(db,"withdrawals_public"),s=>{
+    let totals={};
+    s.forEach(x=>{
+      let d=x.data();
+      totals[d.targetUsername]=(totals[d.targetUsername]||0)+(d.amount||0);
+    });
+    let arr=Object.entries(totals).sort((a,b)=>b[1]-a[1]).slice(0,20);
+    $("leaderboardList").innerHTML="";
+    arr.forEach(([name,total],i)=>{
+      let e=document.createElement("div");e.className="sub";
+      e.innerHTML=`${i+1}. ${safe(name)} — <b>${total}</b> ⭐`;
+      $("leaderboardList").append(e);
+    });
+  });
+}
 
 function listenTasks(){
   onSnapshot(query(collection(db,"tasks"),orderBy("createdAt","desc")),s=>{
@@ -135,6 +190,7 @@ $("withdraw").addEventListener("click",async e=>{
   }
 });
 
+// Free Spin
 function updateSpinUI(){
   let remaining=24*60*60*1000-(Date.now()-lastSpinMs);
   if(remaining>0){
@@ -162,6 +218,7 @@ $("spinBtn").onclick=async()=>{
   }catch(e){$("spinMsg").textContent=e.message}
 };
 
+// Публичная статистика выводов
 function listenWithdrawals(){
   onSnapshot(query(collection(db,"withdrawals_public"),orderBy("approvedAt","desc")),s=>{
     $("withdrawCount").textContent=s.size;
@@ -216,8 +273,24 @@ async function approveSub(d){
       let sd=doc(db,"submissions",d.id),ud=doc(db,"users",d.userId);
       let[ss,us]=await Promise.all([t.get(sd),t.get(ud)]);
       if(ss.data().status!=="pending")throw Error("Уже обработано.");
+      let udata=us.data()||{};
+      let refDoc=null,refSnap=null,referrerDoc=null,referrerSnap=null,newCount=0,willReward=false;
+      if(udata.referredBy&&udata.referralDocId&&!udata.referralRewarded){
+        refDoc=doc(db,"referrals",udata.referralDocId);
+        refSnap=await t.get(refDoc);
+        if(refSnap.exists()&&!refSnap.data().rewarded){
+          newCount=(refSnap.data().tasksCompleted||0)+1;
+          if(newCount>=2){
+            willReward=true;
+            referrerDoc=doc(db,"users",refSnap.data().referrerId);
+            referrerSnap=await t.get(referrerDoc);
+          }
+        }else{refDoc=null}
+      }
       t.update(sd,{status:"approved",approvedAt:serverTimestamp()});
-      t.update(ud,{balance:(us.data().balance||0)+d.reward});
+      t.update(ud,{balance:(udata.balance||0)+d.reward,...(willReward?{referralRewarded:true}:{})});
+      if(refDoc)t.update(refDoc,{tasksCompleted:newCount,...(willReward?{rewarded:true}:{})});
+      if(willReward&&referrerDoc)t.update(referrerDoc,{balance:(referrerSnap.data().balance||0)+1});
     });
   }catch(e){alert(e.message)}
 }
