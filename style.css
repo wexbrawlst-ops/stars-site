@@ -1,5 +1,9 @@
 :root{--bg:#0d1117;--fg:#fff;--card:#161b22;--border:#30363d;--input-bg:#0d1117;--accent:#f2c94c;--accent-fg:#111;--muted:#8b949e;--balance-bg:#21262d}
 body.light{--bg:#f2f2f2;--fg:#111;--card:#ffffff;--border:#ddd;--input-bg:#fff;--accent:#f2c94c;--accent-fg:#111;--muted:#666;--balance-bg:#eaeaea}
+body.pink{--bg:#fff0f6;--fg:#5c1a3d;--card:#ffffff;--border:#f5b8d6;--input-bg:#fff;--accent:#ff6fa5;--accent-fg:#fff;--muted:#a86487;--balance-bg:#ffe0ee}
+body.white{--bg:#ffffff;--fg:#111;--card:#f7f7f7;--border:#e2e2e2;--input-bg:#fff;--accent:#333;--accent-fg:#fff;--muted:#888;--balance-bg:#eeeeee}
+body.orange{--bg:#fff4e6;--fg:#5c3300;--card:#ffffff;--border:#ffcf94;--input-bg:#fff;--accent:#ff9800;--accent-fg:#fff;--muted:#a97a3c;--balance-bg:#ffe4bd}
+body.pastel{--bg:#f4f7fb;--fg:#3a3a4a;--card:#ffffff;--border:#dfe6f0;--input-bg:#fff;--accent:#b8c9f0;--accent-fg:#2c3350;--muted:#8f9bb3;--balance-bg:#e8edfb}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--fg);font-family:Arial,sans-serif;transition:background .2s,color .2s}
 .app{max-width:700px;margin:auto;padding:20px}
@@ -9,12 +13,14 @@ input{background:var(--input-bg);color:var(--fg);border:1px solid var(--border)}
 button{background:var(--accent);color:var(--accent-fg);font-weight:700;cursor:pointer}
 button.dark{background:var(--border);color:var(--fg)}
 header{display:flex;justify-content:space-between;align-items:center}
-.balance{font-size:24px;padding:18px;background:var(--balance-bg);border-radius:16px;margin:12px 0}
+.balance{position:sticky;top:8px;z-index:20;display:inline-block;font-size:15px;padding:8px 16px;background:var(--balance-bg);border-radius:999px;margin:8px 0;box-shadow:0 2px 8px rgba(0,0,0,.2)}
 nav,.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .task,.order{padding:14px;border:1px solid var(--border);border-radius:14px;margin:8px 0}
 .task{display:flex;justify-content:space-between;gap:8px}
 .task button{width:auto}
 .task button:disabled{background:var(--border);color:var(--muted);font-weight:400;cursor:default}
+.likeBtn{width:auto!important;padding:4px 10px!important;font-size:13px!important;font-weight:400!important;background:transparent!important;color:var(--fg)!important;border:1px solid var(--border)!important}
+.profIcon{cursor:pointer}
 .sub{padding:12px;border:1px solid var(--border);border-radius:12px;margin:8px 0}
 .sub button{width:auto;display:inline-block;margin-right:6px}
 .gift{display:grid;grid-template-columns:1fr 1fr;gap:8px}
