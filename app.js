@@ -7,7 +7,7 @@ const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app),$
 const ADMIN_EMAIL="brawlstarsk93k@gmail.com";
 const COLOR_HEX={red:"#ff4444",blue:"#33b5ff",pink:"#ff69b4",purple:"#a64dff"};
 const COLOR_NAMES_RU={red:"Красный",blue:"Голубой",pink:"Розовый",purple:"Фиолетовый"};
-let u,amount,gift,unsubOrders,unsubPending,unsubApproved,unsubAdminTasks,unsubVip,unsubShop,timeInterval;
+let u,amount,gift,unsubOrders,unsubPending,unsubApproved,unsubAdminTasks,unsubVip,unsubShop,unsubPromo,timeInterval;
 let tasksCache=[],subsByTask={},lastSpinMs=0,isVip=false,myData={};
 
 /* ---------- i18n ---------- */
@@ -110,7 +110,7 @@ $("langSelect").value=curLang;
 $("langSelect").onchange=()=>{localStorage.setItem("lang",$("langSelect").value);location.reload()};
 
 /* ---------- Тема оформления ---------- */
-const THEMES=["dark","light","pink","white","orange","pastel"];
+const THEMES=["dark","light","pink","white","orange","pastel","glass"];
 function applyTheme(th){
   THEMES.forEach(x=>document.body.classList.remove(x));
   if(th!=="dark")document.body.classList.add(th);
@@ -118,6 +118,25 @@ function applyTheme(th){
 }
 applyTheme(localStorage.getItem("theme")||"dark");
 document.querySelectorAll("[data-theme]").forEach(b=>b.onclick=()=>applyTheme(b.dataset.theme));
+
+const FONTSIZES=["text-sm","text-lg"];
+function applyFontSize(sz){
+  FONTSIZES.forEach(x=>document.body.classList.remove(x));
+  if(sz==="sm")document.body.classList.add("text-sm");
+  if(sz==="lg")document.body.classList.add("text-lg");
+  localStorage.setItem("fontSize",sz);
+}
+applyFontSize(localStorage.getItem("fontSize")||"md");
+document.querySelectorAll("[data-fontsize]").forEach(b=>b.onclick=()=>applyFontSize(b.dataset.fontsize));
+
+function applyGlow(on){
+  document.body.classList.toggle("glow",on);
+  localStorage.setItem("glow",on?"1":"0");
+}
+let glowOn=localStorage.getItem("glow")!=="0";
+applyGlow(glowOn);
+$("glowToggle").checked=glowOn;
+$("glowToggle").onchange=()=>applyGlow($("glowToggle").checked);
 
 /* ---------- Счётчик посещений ---------- */
 setDoc(doc(db,"stats","global"),{totalVisits:increment(1)},{merge:true}).catch(()=>{});
@@ -177,6 +196,7 @@ onAuthStateChanged(auth,x=>{
     $("profWithdrawn").textContent=myData.totalWithdrawn||0;
     $("profPrivate").checked=!!myData.profilePrivate;
     renderColorPicker();
+    $("glassThemeBtnWrap").hidden=!(myData.ownedThemes||[]).includes("glass");
     renderUserTasks();
   });
   listenTasks();
@@ -305,14 +325,20 @@ function listenMySubs(){
 }
 function renderUserTasks(){
   $("taskList").innerHTML="";
+  let now=Date.now();
   tasksCache.forEach(d=>{
     let sub=subsByTask[d.id];
     let e=document.createElement("div");e.className="task";
     let label=t("doTask"),disabled=false;
+    let expired=d.expiresAt&&d.expiresAt.toMillis()<now;
+    let full=d.maxUses&&(d.usesCount||0)>=d.maxUses;
     if(sub&&sub.status==="approved"){label=t("doneTask");disabled=true}
     else if(sub&&sub.status==="pending"){label=t("pendingTask");disabled=true}
+    else if(expired){label="Истекло";disabled=true}
+    else if(full){label="Лимит исчерпан";disabled=true}
     let liked=(myData.likedTasks||[]).includes(d.id);
-    e.innerHTML=`<span><b>${safe(d.title)}</b><br><small>${safe(d.description||"")} · +${d.reward} ⭐</small><br><button class="likeBtn">${liked?"❤️":"🤍"} ${d.likesCount||0}</button></span><button class="doBtn" ${disabled?"disabled":""}>${label}</button>`;
+    let limitInfo=d.maxUses?` · ${d.usesCount||0}/${d.maxUses}`:"";
+    e.innerHTML=`<span><b>${safe(d.title)}</b><br><small>${safe(d.description||"")} · +${d.reward} ⭐${limitInfo}</small><br><button class="likeBtn">${liked?"❤️":"🤍"} ${d.likesCount||0}</button></span><button class="doBtn" ${disabled?"disabled":""}>${label}</button>`;
     e.querySelector(".likeBtn").onclick=()=>toggleLike(d);
     if(!disabled)e.querySelector(".doBtn").onclick=()=>startTask(d);
     $("taskList").append(e);
@@ -335,7 +361,7 @@ async function toggleLike(d){
     });
   }catch(e){alert(e.message)}
 }
-function startTask(d){
+async function startTask(d){
   let handle=myData.telegramUsername;
   if(!handle){
     handle=prompt("Введите ваш username в Telegram (без @ можно):");
@@ -343,8 +369,17 @@ function startTask(d){
     handle=handle.trim();
     updateDoc(doc(db,"users",u.uid),{telegramUsername:handle}).catch(()=>{});
   }
-  if(d.link)window.open(d.link,"_blank");
-  addDoc(collection(db,"submissions"),{taskId:d.id,title:d.title,reward:d.reward,link:d.link||"",telegramUsername:handle,userId:u.uid,status:"pending",vip:isVip,createdAt:serverTimestamp()}).catch(e=>alert(e.message));
+  try{
+    await runTransaction(db,async tr=>{
+      let td=doc(db,"tasks",d.id),ts=await tr.get(td),tdata=ts.data()||{};
+      if(tdata.expiresAt&&tdata.expiresAt.toMillis()<Date.now())throw Error("Срок задания истёк.");
+      if(tdata.maxUses&&(tdata.usesCount||0)>=tdata.maxUses)throw Error("Достигнут лимит выполнений.");
+      tr.update(td,{usesCount:(tdata.usesCount||0)+1});
+      let sd=doc(collection(db,"submissions"));
+      tr.set(sd,{taskId:d.id,title:d.title,reward:d.reward,link:d.link||"",telegramUsername:handle,userId:u.uid,status:"pending",vip:isVip,createdAt:serverTimestamp()});
+    });
+    if(d.link)window.open(d.link,"_blank");
+  }catch(e){alert(e.message)}
 }
 
 document.querySelectorAll("[data-page]").forEach(b=>b.onclick=()=>{
@@ -361,21 +396,42 @@ document.querySelectorAll("[data-apage]").forEach(b=>b.onclick=()=>{
   if(b.dataset.apage==="orders")loadOrders();
   if(b.dataset.apage==="vip")loadVipRequests();
   if(b.dataset.apage==="shop")loadShopRequests();
+  if(b.dataset.apage==="promo")loadAdminPromos();
 });
 
 $("usePromo").onclick=async()=>{
   let code=$("promoCode").value.trim();
+  let grantedColor=null;
   try{
     await runTransaction(db,async t=>{
       let ud=doc(db,"users",u.uid),pd=doc(db,"promocodes",code),rd=doc(db,"users",u.uid,"promos",code);
       let[us,ps,rs]=await Promise.all([t.get(ud),t.get(pd),t.get(rd)]);
       if(!ps.exists())throw Error("Промокод не найден.");
       let p=ps.data();
-      if(p.type!=="stars")throw Error("Промокод не найден.");
       if(rs.exists())throw Error("Уже использован.");
-      t.update(ud,{balance:(us.data().balance||0)+p.amount});
+      if(p.maxUses!=null&&(p.usedCount||0)>=p.maxUses)throw Error("Промокод исчерпан.");
+      let udata=us.data()||{};
+      if(p.type==="stars"){
+        t.update(ud,{balance:(udata.balance||0)+(p.amount||0)});
+      }else if(p.type==="vip"){
+        let until=new Date(Date.now()+30*24*60*60*1000);
+        t.update(ud,{vip:true,vipUntil:until,balance:(udata.balance||0)+5});
+      }else if(p.type==="color"){
+        let owned=udata.ownedColors||[];
+        if(!owned.includes(p.color))owned=[...owned,p.color];
+        t.update(ud,{ownedColors:owned,nickColor:p.color});
+        grantedColor=p.color;
+      }else if(p.type==="theme"){
+        let ownedT=udata.ownedThemes||[];
+        if(!ownedT.includes("glass"))ownedT=[...ownedT,"glass"];
+        t.update(ud,{ownedThemes:ownedT});
+      }else{
+        throw Error("Промокод не найден.");
+      }
+      t.update(pd,{usedCount:(p.usedCount||0)+1});
       t.set(rd,{at:serverTimestamp()});
     });
+    if(grantedColor)syncPublicProfile(u.uid,{nickColor:grantedColor});
     $("promoMsg").textContent="Готово!";
   }catch(e){$("promoMsg").textContent=e.message}
 };
@@ -461,8 +517,17 @@ function listenWithdrawals(){
 $("addTask").onclick=async()=>{
   let title=$("tTitle").value.trim(),description=$("tDesc").value.trim(),link=$("tLink").value.trim(),reward=parseFloat($("tReward").value);
   if(!title||!link||!reward||reward<=0)return alert("Заполни название, ссылку и награду (больше 0)");
-  await addDoc(collection(db,"tasks"),{title,description,link,reward,likesCount:0,createdAt:serverTimestamp()});
-  $("tTitle").value="";$("tDesc").value="";$("tLink").value="";$("tReward").value="";
+  let maxUses=$("tMaxUses").value?parseInt($("tMaxUses").value):null;
+  let durVal=$("tDurationVal").value?parseFloat($("tDurationVal").value):null;
+  let durUnit=$("tDurationUnit").value;
+  let data={title,description,link,reward,likesCount:0,usesCount:0,createdAt:serverTimestamp()};
+  if(maxUses)data.maxUses=maxUses;
+  if(durVal){
+    let ms=durUnit==="hours"?durVal*3600000:durVal*86400000;
+    data.expiresAt=new Date(Date.now()+ms);
+  }
+  await addDoc(collection(db,"tasks"),data);
+  $("tTitle").value="";$("tDesc").value="";$("tLink").value="";$("tReward").value="";$("tMaxUses").value="";$("tDurationVal").value="";
 };
 
 function loadAdminTasks(){
@@ -471,7 +536,7 @@ function loadAdminTasks(){
     $("adminTasks").innerHTML="";
     s.forEach(x=>{
       let d=x.data(),e=document.createElement("div");e.className="sub";
-      e.innerHTML=`<b>${safe(d.title)}</b> · +${d.reward} ⭐ · 🤍${d.likesCount||0}<br><small>${safe(d.link||"")}</small><br><button class="del">${t("deleteBtn")}</button>`;
+      e.innerHTML=`<b>${safe(d.title)}</b> · +${d.reward} ⭐ · 🤍${d.likesCount||0}${d.maxUses?` · ${d.usesCount||0}/${d.maxUses}`:""}${d.expiresAt?` · до ${d.expiresAt.toDate().toLocaleString()}`:""}<br><small>${safe(d.link||"")}</small><br><button class="del">${t("deleteBtn")}</button>`;
       e.querySelector(".del").onclick=()=>{if(confirm("Удалить задание?"))deleteDoc(doc(db,"tasks",x.id))};
       $("adminTasks").append(e);
     });
@@ -489,7 +554,13 @@ function loadPendingSubs(){
       let e=document.createElement("div");e.className="sub";
       e.innerHTML=`<b>${d.vip?"👑 ":""}${safe(d.title)}</b> · +${d.reward} ⭐<br>Telegram: <b>${safe(d.telegramUsername)}</b>${d.link?` · <a href="${safe(d.link)}" target="_blank">ссылка</a>`:""}<br><button class="ok">${t("confirmBtn")}</button><button class="bad">${t("declineBtn")}</button>`;
       e.querySelector(".ok").onclick=()=>approveSub(d);
-      e.querySelector(".bad").onclick=()=>updateDoc(doc(db,"submissions",d.id),{status:"rejected",rejectedAt:serverTimestamp()});
+      e.querySelector(".bad").onclick=async()=>{
+        await updateDoc(doc(db,"submissions",d.id),{status:"rejected",rejectedAt:serverTimestamp()});
+        try{
+          let td=doc(db,"tasks",d.taskId),ts=await getDoc(td);
+          if(ts.exists())await updateDoc(td,{usesCount:Math.max(0,(ts.data().usesCount||0)-1)});
+        }catch(err){}
+      };
       $("pendingSubs").append(e);
     });
   });
@@ -624,6 +695,39 @@ async function approveColor(reqId,userId,item){
     });
     syncPublicProfile(userId,{nickColor:item});
   }catch(e){alert(e.message)}
+}
+
+$("addPromo").onclick=async()=>{
+  let code=$("pCode").value.trim();
+  let type=$("pType").value;
+  let amount=parseFloat($("pAmount").value)||0;
+  let color=$("pColor").value;
+  let maxUses=$("pMaxUses").value?parseInt($("pMaxUses").value):null;
+  if(!code)return alert("Введите код");
+  if(type==="stars"&&(!amount||amount<=0))return alert("Укажите количество звёзд");
+  let data={type,usedCount:0,createdAt:serverTimestamp()};
+  if(type==="stars")data.amount=amount;
+  if(type==="color")data.color=color;
+  if(maxUses)data.maxUses=maxUses;
+  try{
+    await setDoc(doc(db,"promocodes",code),data);
+    $("pCode").value="";$("pAmount").value="";$("pMaxUses").value="";
+    alert("Промокод создан!");
+  }catch(e){alert(e.message)}
+};
+
+function loadAdminPromos(){
+  if(unsubPromo)unsubPromo();
+  unsubPromo=onSnapshot(collection(db,"promocodes"),s=>{
+    $("adminPromos").innerHTML="";
+    s.forEach(x=>{
+      let d=x.data(),e=document.createElement("div");e.className="sub";
+      let info=d.type==="stars"?`${d.amount} ⭐`:d.type==="vip"?"VIP 30 дней":d.type==="theme"?"Тема «Жидкое стекло»":`цвет: ${COLOR_NAMES_RU[d.color]||d.color}`;
+      e.innerHTML=`<b>${safe(x.id)}</b> — ${info} · использован ${d.usedCount||0}${d.maxUses?"/"+d.maxUses:""} раз<br><button class="del">${t("deleteBtn")}</button>`;
+      e.querySelector(".del").onclick=()=>{if(confirm("Удалить промокод?"))deleteDoc(doc(db,"promocodes",x.id))};
+      $("adminPromos").append(e);
+    });
+  });
 }
 
 function safe(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]))}
