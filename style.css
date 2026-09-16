@@ -6,7 +6,8 @@ body.orange{--bg:#fff4e6;--fg:#5c3300;--card:#ffffff;--border:#ffcf94;--input-bg
 body.pastel{--bg:#f4f7fb;--fg:#3a3a4a;--card:#ffffff;--border:#dfe6f0;--input-bg:#fff;--accent:#b8c9f0;--accent-fg:#2c3350;--muted:#8f9bb3;--balance-bg:#e8edfb}
 body.glass{--bg:#0b0b0d;--fg:#f4e9c9;--card:rgba(255,255,255,.06);--border:rgba(212,175,55,.45);--input-bg:rgba(255,255,255,.05);--accent:rgba(255,255,255,.14);--accent-fg:#f4e9c9;--muted:#b8ab7e;--balance-bg:rgba(212,175,55,.16);background:radial-gradient(circle at top,#1a1a1d,#000)}
 body.glass .card{backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
-body.glass button{backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(212,175,55,.5)!important}
+body.glass button{backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(212,175,55,.5)!important;filter:grayscale(1) sepia(1) saturate(2.2) brightness(.95)}
+body.glass .balance{filter:grayscale(1) sepia(1) saturate(2.2) brightness(.95)}
 body.text-sm{font-size:13px}
 body.text-lg{font-size:18px}
 body.glow button:not(:disabled){box-shadow:0 0 10px rgba(255,255,255,.55)}
