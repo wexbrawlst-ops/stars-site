@@ -46,6 +46,14 @@
 <button data-theme="orange">🟠 Оранжевая</button>
 <button data-theme="pastel">🎨 Нежная</button>
 </div>
+<div id="glassThemeBtnWrap" hidden><button data-theme="glass">🖤 Жидкое стекло</button></div>
+<p><label><input type="checkbox" id="glowToggle" style="width:auto;display:inline-block"> Свечение вокруг кнопок</label></p>
+<p>Размер текста:</p>
+<div class="grid">
+<button data-fontsize="sm">Маленький</button>
+<button data-fontsize="md">Средний</button>
+<button data-fontsize="lg">Большой</button>
+</div>
 <p data-i18n="settingsLangLabel">Язык:</p>
 <select id="langSelect">
 <option value="ru">Русский</option>
@@ -65,6 +73,7 @@
 <button data-apage="orders" data-i18n="adminOrders">🎁 Заявки на вывод</button>
 <button data-apage="vip" data-i18n="adminVip">👑 Выдача VIP</button>
 <button data-apage="shop" data-i18n="adminShop">🎨 Заявки на цвет</button>
+<button data-apage="promo">🎟 Промокоды</button>
 </nav>
 <div id="admin-create" class="apage">
 <h3 data-i18n="adminCreate">Создать задание</h3>
@@ -72,6 +81,12 @@
 <input id="tDesc" data-i18n-ph="descPh" placeholder="Описание (необязательно)">
 <input id="tLink" data-i18n-ph="linkPh" placeholder="Ссылка на Telegram-канал/пост">
 <input id="tReward" type="number" min="0.1" step="0.1" data-i18n-ph="rewardPh" placeholder="Награда ⭐ (можно 0.1 или 0.5)">
+<input id="tMaxUses" type="number" min="1" placeholder="Лимит выполнений (пусто = без лимита)">
+<input id="tDurationVal" type="number" min="1" placeholder="Срок действия (число)">
+<select id="tDurationUnit">
+<option value="hours">часов</option>
+<option value="days">дней</option>
+</select>
 <button id="addTask" data-i18n="addTaskBtn">Создать задание</button>
 </div>
 <div id="admin-mytasks" class="apage" hidden><h3 data-i18n="adminMyTasks">Мои задания</h3><div id="adminTasks"></div></div>
@@ -80,6 +95,27 @@
 <div id="admin-orders" class="apage" hidden><h3 data-i18n="adminOrders">Заявки на вывод</h3><div id="orders"></div></div>
 <div id="admin-vip" class="apage" hidden><h3>Заявки на VIP</h3><div id="vipRequests"></div></div>
 <div id="admin-shop" class="apage" hidden><h3>Заявки на цвет ника</h3><div id="shopRequests"></div></div>
+<div id="admin-promo" class="apage" hidden>
+<h3>Создать промокод</h3>
+<input id="pCode" placeholder="Код (например: SALE2024)">
+<select id="pType">
+<option value="stars">Звёзды</option>
+<option value="vip">VIP (30 дней)</option>
+<option value="color">Цвет ника</option>
+<option value="theme">Тема «Жидкое стекло»</option>
+</select>
+<input id="pAmount" type="number" min="0.1" step="0.1" placeholder="Количество ⭐ (для типа Звёзды)">
+<select id="pColor">
+<option value="red">Красный</option>
+<option value="blue">Голубой</option>
+<option value="pink">Розовый</option>
+<option value="purple">Фиолетовый</option>
+</select>
+<input id="pMaxUses" type="number" min="1" placeholder="Сколько человек могут ввести (пусто = без лимита)">
+<button id="addPromo">Создать промокод</button>
+<h3>Мои промокоды</h3>
+<div id="adminPromos"></div>
+</div>
 </section>
 </section>
 <footer id="siteFooter"><span data-i18n="visitsLabel">Посещений сайта:</span> <b id="visitCount">0</b> · <span data-i18n="usersLabel">Зарегистрировано пользователей:</span> <b id="userCount">0</b></footer>
