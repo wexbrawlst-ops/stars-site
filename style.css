@@ -4,14 +4,21 @@ body.pink{--bg:#fff0f6;--fg:#5c1a3d;--card:#ffffff;--border:#f5b8d6;--input-bg:#
 body.white{--bg:#ffffff;--fg:#111;--card:#f7f7f7;--border:#e2e2e2;--input-bg:#fff;--accent:#333;--accent-fg:#fff;--muted:#888;--balance-bg:#eeeeee}
 body.orange{--bg:#fff4e6;--fg:#5c3300;--card:#ffffff;--border:#ffcf94;--input-bg:#fff;--accent:#ff9800;--accent-fg:#fff;--muted:#a97a3c;--balance-bg:#ffe4bd}
 body.pastel{--bg:#f4f7fb;--fg:#3a3a4a;--card:#ffffff;--border:#dfe6f0;--input-bg:#fff;--accent:#b8c9f0;--accent-fg:#2c3350;--muted:#8f9bb3;--balance-bg:#e8edfb}
+body.glass{--bg:#0b0b0d;--fg:#f4e9c9;--card:rgba(255,255,255,.06);--border:rgba(212,175,55,.45);--input-bg:rgba(255,255,255,.05);--accent:rgba(255,255,255,.14);--accent-fg:#f4e9c9;--muted:#b8ab7e;--balance-bg:rgba(212,175,55,.16);background:radial-gradient(circle at top,#1a1a1d,#000)}
+body.glass .card{backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+body.glass button{backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(212,175,55,.5)!important}
+body.text-sm{font-size:13px}
+body.text-lg{font-size:18px}
+body.glow button:not(:disabled){box-shadow:0 0 10px rgba(255,255,255,.55)}
+body.glow.glass button:not(:disabled){box-shadow:0 0 10px rgba(212,175,55,.5)}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--fg);font-family:Arial,sans-serif;transition:background .2s,color .2s}
 .app{max-width:700px;margin:auto;padding:20px}
 .card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:22px;margin:10px 0}
 input,button{width:100%;padding:14px;border-radius:12px;border:0;margin:6px 0;font-size:15px}
 input{background:var(--input-bg);color:var(--fg);border:1px solid var(--border)}
-button{background:var(--accent);color:var(--accent-fg);font-weight:700;cursor:pointer}
-button.dark{background:var(--border);color:var(--fg)}
+button{background-image:linear-gradient(180deg,rgba(255,255,255,.22),rgba(255,255,255,0) 55%);background-color:var(--accent);color:var(--accent-fg);font-weight:700;cursor:pointer}
+button.dark{background-image:linear-gradient(180deg,rgba(255,255,255,.1),rgba(255,255,255,0) 55%);background-color:var(--border);color:var(--fg)}
 header{display:flex;justify-content:space-between;align-items:center}
 .balance{position:sticky;top:8px;z-index:20;display:inline-block;font-size:15px;padding:8px 16px;background:var(--balance-bg);border-radius:999px;margin:8px 0;box-shadow:0 2px 8px rgba(0,0,0,.2)}
 nav,.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
