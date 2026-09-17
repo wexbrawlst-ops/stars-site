@@ -1,5 +1,5 @@
 import{initializeApp}from"https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
-import{getAuth,createUserWithEmailAndPassword,signInWithEmailAndPassword,onAuthStateChanged,signOut}from"https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
+import{getAuth,createUserWithEmailAndPassword,signInWithEmailAndPassword,onAuthStateChanged,signOut,sendPasswordResetEmail,updateEmail,reauthenticateWithCredential,EmailAuthProvider}from"https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
 import{getFirestore,doc,getDoc,setDoc,updateDoc,deleteDoc,collection,addDoc,onSnapshot,query,where,orderBy,limit,increment,runTransaction,serverTimestamp}from"https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 
 const firebaseConfig={apiKey:"AIzaSyCgiJ2OLgRf9rep6enYQTohuHGf9PAT6xQ",authDomain:"stars-f6d41.firebaseapp.com",projectId:"stars-f6d41",storageBucket:"stars-f6d41.firebasestorage.app",messagingSenderId:"294339505512",appId:"1:294339505512:web:2c0a8cc124c91d5d6dbadd"};
@@ -110,7 +110,7 @@ $("langSelect").value=curLang;
 $("langSelect").onchange=()=>{localStorage.setItem("lang",$("langSelect").value);location.reload()};
 
 /* ---------- Тема оформления ---------- */
-const THEMES=["dark","light","pink","white","orange","pastel","glass"];
+const THEMES=["dark","light","pink","white","orange","pastel","glass","neon","forest"];
 function applyTheme(th){
   THEMES.forEach(x=>document.body.classList.remove(x));
   if(th!=="dark")document.body.classList.add(th);
@@ -169,18 +169,29 @@ $("reg").onclick=async()=>{
         });
       }catch(e){/*реферал не критичен*/}
     }
-    await setDoc(doc(db,"users",c.user.uid),{email:c.user.email,balance:0,createdAt:serverTimestamp(),referredBy,referralDocId,referralRewarded:false});
+    let displayName=$("regName").value.trim()||null;
+    await setDoc(doc(db,"users",c.user.uid),{email:c.user.email,balance:0,createdAt:serverTimestamp(),referredBy,referralDocId,referralRewarded:false,displayName});
+    if(displayName)syncPublicProfile(c.user.uid,{displayName});
     await setDoc(doc(db,"stats","global"),{totalUsers:increment(1)},{merge:true});
   }catch(e){$("authMsg").textContent=e.message}
 };
 $("login").onclick=async()=>{try{await signInWithEmailAndPassword(auth,$("email").value,$("pass").value)}catch(e){$("authMsg").textContent=e.message}};
-$("logout").onclick=()=>signOut(auth);
+$("logout").onclick=()=>{if(confirm("Точно выйти из аккаунта?"))signOut(auth)};
+$("forgotPass").onclick=async()=>{
+  let email=$("email").value.trim();
+  if(!email)return $("authMsg").textContent="Введите email в поле выше, затем нажмите «Забыли пароль?» снова.";
+  try{
+    await sendPasswordResetEmail(auth,email);
+    $("authMsg").textContent="Письмо для сброса пароля отправлено на "+email;
+  }catch(e){$("authMsg").textContent=e.message}
+};
 
 onAuthStateChanged(auth,x=>{
   u=x;
   if(!x){$("auth").hidden=false;$("main").hidden=true;if(timeInterval)clearInterval(timeInterval);return}
   $("auth").hidden=true;$("main").hidden=false;
   $("refLink").value=location.origin+location.pathname+"?ref="+u.uid;
+  let greeted=false;
   onSnapshot(doc(db,"users",u.uid),s=>{
     myData=s.data()||{};
     $("bal").textContent=myData.balance||0;
@@ -192,18 +203,25 @@ onAuthStateChanged(auth,x=>{
     isVip=!!(myData.vip&&vipUntilMs>Date.now());
     $("vipStatus").textContent=isVip?`✅ VIP активен до ${new Date(vipUntilMs).toLocaleDateString()}`:"VIP не активен";
     $("myUsername").value=myData.telegramUsername||"";
+    $("myDisplayName").value=myData.displayName||"";
     $("profTime").textContent=formatDuration(myData.totalTimeMs||0);
     $("profWithdrawn").textContent=myData.totalWithdrawn||0;
     $("profPrivate").checked=!!myData.profilePrivate;
     renderColorPicker();
     $("glassThemeBtnWrap").hidden=!(myData.ownedThemes||[]).includes("glass");
     renderUserTasks();
+    if(!greeted){
+      greeted=true;
+      if(myData.displayName)$("greetMsg").textContent=`Приветствуем тебя, ${myData.displayName}!`;
+      setTimeout(()=>{$("greetMsg").textContent=""},6000);
+    }
   });
   listenTasks();
   listenMySubs();
   listenWithdrawals();
   listenMyReferrals();
   listenLeaderboard();
+  listenMyHistory();
   if(timeInterval)clearInterval(timeInterval);
   timeInterval=setInterval(()=>{
     let nt=(myData.totalTimeMs||0)+60000;
@@ -223,11 +241,56 @@ $("saveUsername").onclick=async()=>{
   $("usernameMsg").textContent="✅";
 };
 
+$("saveDisplayName").onclick=async()=>{
+  let v=$("myDisplayName").value.trim()||null;
+  await updateDoc(doc(db,"users",u.uid),{displayName:v});
+  syncPublicProfile(u.uid,{displayName:v});
+  $("displayNameMsg").textContent="✅ Сохранено (видно в открытом доступе в профиле)";
+};
+
+$("changeEmailBtn").onclick=async()=>{
+  let newEmail=$("newEmail").value.trim(),pass=$("curPassForEmail").value;
+  if(!newEmail||!pass)return $("changeEmailMsg").textContent="Заполните новый email и текущий пароль.";
+  try{
+    let cred=EmailAuthProvider.credential(u.email,pass);
+    await reauthenticateWithCredential(u,cred);
+    await updateEmail(u,newEmail);
+    await updateDoc(doc(db,"users",u.uid),{email:newEmail});
+    $("changeEmailMsg").textContent="✅ Email изменён на "+newEmail;
+    $("newEmail").value="";$("curPassForEmail").value="";
+  }catch(e){$("changeEmailMsg").textContent=e.message}
+};
+
 $("profPrivate").onchange=()=>{
   let val=$("profPrivate").checked;
   updateDoc(doc(db,"users",u.uid),{profilePrivate:val});
   syncPublicProfile(u.uid,{profilePrivate:val});
 };
+
+function listenMyHistory(){
+  onSnapshot(query(collection(db,"submissions"),where("userId","==",u.uid)),s=>{
+    let list=s.docs.map(x=>({id:x.id,...x.data()}));
+    list.sort((a,b)=>(b.createdAt?.toMillis()||0)-(a.createdAt?.toMillis()||0));
+    $("myHistoryList").innerHTML="";
+    if(!list.length){$("myHistoryList").innerHTML="<p>Заявок пока нет.</p>";return}
+    let statusText={pending:"⏳ На проверке",approved:"✅ Одобрено",rejected:"❌ Отклонено",revoked:"⚠️ Отозвано"};
+    list.forEach(d=>{
+      let e=document.createElement("div");e.className="sub";
+      e.innerHTML=`<b>${safe(d.title)}</b> · +${d.reward} ⭐<br>${statusText[d.status]||safe(d.status)}${d.status==="pending"?'<br><button class="bad">Отменить заявку</button>':''}`;
+      let b=e.querySelector("button");
+      if(b)b.onclick=()=>cancelSubmission(d);
+      $("myHistoryList").append(e);
+    });
+  });
+}
+async function cancelSubmission(d){
+  if(!confirm("Отменить заявку на это задание?"))return;
+  try{
+    await deleteDoc(doc(db,"submissions",d.id));
+    let td=doc(db,"tasks",d.taskId),ts=await getDoc(td);
+    if(ts.exists())await updateDoc(td,{usesCount:Math.max(0,(ts.data().usesCount||0)-1)});
+  }catch(e){alert(e.message)}
+}
 
 $("buyVipBtn").onclick=async()=>{
   window.open("https://t.me/WexBob","_blank");
@@ -361,11 +424,14 @@ async function toggleLike(d){
     });
   }catch(e){alert(e.message)}
 }
+let startingTask=false;
 async function startTask(d){
+  if(startingTask)return;
+  startingTask=true;
   let handle=myData.telegramUsername;
   if(!handle){
     handle=prompt("Введите ваш username в Telegram (без @ можно):");
-    if(!handle||!handle.trim())return;
+    if(!handle||!handle.trim()){startingTask=false;return}
     handle=handle.trim();
     updateDoc(doc(db,"users",u.uid),{telegramUsername:handle}).catch(()=>{});
   }
@@ -380,6 +446,7 @@ async function startTask(d){
     });
     if(d.link)window.open(d.link,"_blank");
   }catch(e){alert(e.message)}
+  finally{startingTask=false}
 }
 
 document.querySelectorAll("[data-page]").forEach(b=>b.onclick=()=>{
