@@ -1,10 +1,12 @@
 <!doctype html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>⭐ Бесплатные звёзды</title><link rel="stylesheet" href="style.css"></head><body><main class="app">
-<section id="auth" class="card"><h1 data-i18n="appTitle">⭐ Бесплатные звёзды</h1><p data-i18n="appTagline">Выполняй задания и получай звёзды.</p><input id="email" type="email" data-i18n-ph="emailPh" placeholder="Email"><input id="pass" type="password" data-i18n-ph="passPh" placeholder="Пароль"><button id="login" data-i18n="loginBtn">Войти</button><button id="reg" class="dark" data-i18n="regBtn">Регистрация</button><p id="authMsg"></p></section>
+<section id="auth" class="card"><h1 data-i18n="appTitle">⭐ Бесплатные звёзды</h1><p data-i18n="appTagline">Выполняй задания и получай звёзды.</p><input id="email" type="email" data-i18n-ph="emailPh" placeholder="Email"><input id="pass" type="password" data-i18n-ph="passPh" placeholder="Пароль"><input id="regName" placeholder="Ваше имя (необязательно)"><p style="font-size:12px;color:var(--muted)">Имя будет видно в открытом доступе — в вашем профиле. Можно оставить пустым.</p><button id="login" data-i18n="loginBtn">Войти</button><button id="reg" class="dark" data-i18n="regBtn">Регистрация</button><p id="authMsg"></p><button id="forgotPass" class="dark" style="font-size:13px">Забыли пароль?</button></section>
 <section id="main" hidden>
 <header><b>⭐ Stars</b><button id="logout" class="dark" data-i18n="logoutBtn">Выйти</button></header>
+<p id="greetMsg" style="font-weight:700"></p>
 <div class="balance">⭐ <b id="bal">0</b></div>
 <nav>
 <button data-page="tasks" data-i18n="navTasks">📋 Задания</button>
+<button data-page="myhistory">📜 Мои заявки</button>
 <button data-page="withdraw" data-i18n="navWithdraw">🎁 Вывод</button>
 <button data-page="promo" data-i18n="navPromo">🎟 Промокод</button>
 <button data-page="spin" data-i18n="navSpin">🎰 Спин</button>
@@ -18,6 +20,7 @@
 <button id="adminBtn" data-page="admin" hidden data-i18n="navAdmin">🛠 Админ</button>
 </nav>
 <section id="tasks" class="card page"><h2 data-i18n="tasksHeader">Задания</h2><button id="customTaskBtn" class="dark" data-i18n="createOwnTask">➕ Создать своё задание</button><div id="customTaskInfo" hidden><p><span data-i18n="customTaskPrice">Своё задание стоит 15 ⭐ и будет активно 2 недели.</span></p><p data-i18n="customTaskContact">За покупкой — к @WexBob. Напишите ему, обговорим какое задание нужно, и я сам его выставлю.</p><a href="https://t.me/WexBob" target="_blank"><button data-i18n="writeWexBob">Написать @WexBob</button></a></div><div id="taskList"></div></section>
+<section id="myhistory" class="card page" hidden><button class="dark" data-page="tasks" data-i18n="backBtn">← Главное меню</button><h2>📜 Мои заявки</h2><div id="myHistoryList"></div></section>
 <section id="withdraw" class="card page" hidden><button class="dark" data-page="tasks" data-i18n="backBtn">← Главное меню</button><h2 data-i18n="withdrawHeader">🎁 Вывод</h2><p data-i18n="withdrawWarn">Если звёзд недостаточно, вывести их нельзя.</p><h3 data-i18n="withdrawChooseAmount">Выберите сумму:</h3><div class="grid"><button data-amount="15">15 ⭐</button><button data-amount="25">25 ⭐</button><button data-amount="50">50 ⭐</button></div><div id="flow"></div></section>
 <section id="promo" class="card page" hidden><button class="dark" data-page="tasks" data-i18n="backBtn">← Главное меню</button><h2 data-i18n="promoHeader">🎟 Промокод</h2><input id="promoCode" data-i18n-ph="promoPh" placeholder="Введите промокод"><button id="usePromo" data-i18n="promoBtn">Активировать</button><p id="promoMsg"></p></section>
 <section id="spin" class="card page" hidden><button class="dark" data-page="tasks" data-i18n="backBtn">← Главное меню</button><h2 data-i18n="spinHeader">🎰 Free Spin</h2><p data-i18n="spinDesc">Раз в 24 часа можно испытать удачу: 0 ⭐ (40%) / 1 ⭐ (50%) / 5 ⭐ (10%).</p><button id="spinBtn" data-i18n="spinBtn">Крутить</button><p id="spinMsg"></p></section>
@@ -37,6 +40,15 @@
 <input id="myUsername" placeholder="@username">
 <button id="saveUsername" data-i18n="saveBtn">Сохранить</button>
 <p id="usernameMsg"></p>
+<p>Ваше имя (видно в открытом доступе в профиле):</p>
+<input id="myDisplayName" placeholder="Имя">
+<button id="saveDisplayName" data-i18n="saveBtn">Сохранить</button>
+<p id="displayNameMsg"></p>
+<p>Сменить email:</p>
+<input id="newEmail" type="email" placeholder="Новый email">
+<input id="curPassForEmail" type="password" placeholder="Текущий пароль (для подтверждения)">
+<button id="changeEmailBtn">Сменить email</button>
+<p id="changeEmailMsg"></p>
 <p data-i18n="settingsThemeLabel">Тема оформления:</p>
 <div class="grid">
 <button data-theme="dark">🌑 Тёмная</button>
@@ -45,6 +57,8 @@
 <button data-theme="white">⚪ Белая</button>
 <button data-theme="orange">🟠 Оранжевая</button>
 <button data-theme="pastel">🎨 Нежная</button>
+<button data-theme="neon">💚 Неон</button>
+<button data-theme="forest">🌲 Лес</button>
 </div>
 <div id="glassThemeBtnWrap" hidden><button data-theme="glass">🖤 Жидкое стекло</button></div>
 <p><label><input type="checkbox" id="glowToggle" style="width:auto;display:inline-block"> Свечение вокруг кнопок</label></p>
